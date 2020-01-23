@@ -39,7 +39,8 @@ class Trade:
 		if self.closedDate != self.listOfRecordedTransactions[-1].date:
 			transactionsToRemove = []
 			for transaction in self.listOfRecordedTransactions:	
-				if transaction.date > self.closedDate
+				if transaction.date > self.closedDate:
+					pass #work on this later
 				
 	def currentSize(self):
 		for transaction in self.listOfRecordedTransactions:
