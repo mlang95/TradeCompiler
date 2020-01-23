@@ -1,0 +1,113 @@
+import pandas as pd
+import datetime import datetime, date
+
+class recordedTransaction:
+	def __init__(self,spy,account,date,size,ticker,price):
+		self.ticker = ticker
+		self.price = price
+		self.size = size
+		self.date = date
+		self.spy = spy
+		self.account = account
+		self.convertToDate()
+		
+	def convertToDate(self):
+		return datetime.strptime(self.date, "%d/%m/%y")
+
+class Trade:
+	def __init__(self,listOfRecordedTransactions):
+		self.currentSize = None
+		self.positionSize = None
+		self.openedDate = None
+		self.closedDate = None
+		self.entries = None
+		self.exits = None
+		self.isClosed = None
+		self.netProceeds = None
+		self.percentReturn = None
+		self.extraTrades = []
+		self.listOfRecordedTransactions = listOfRecordedTransactions
+		self.currentSize()
+		self.isClosed()
+		self.getOpenedDate()
+		if isClosed():
+			self.getPositionSize()
+			self.netProceed()
+			self.percentReturn()
+	
+	def checkForMultipleTrades(self):
+		if self.closedDate != self.listOfRecordedTransactions[-1].date:
+			transactionsToRemove = []
+			for transaction in self.listOfRecordedTransactions:	
+				if transaction.date > self.closedDate
+				
+	def currentSize(self):
+		for transaction in self.listOfRecordedTransactions:
+			self.currentSize += transaction.size
+	def getPositionSize(self):
+		for transaction in self.listOfRecordedTransactions:
+			if transaction.size > 0:
+				self.positionSize += transaction.size
+	def isClosed(self):
+		size = 0
+		newTrade = []
+		for i,transaction in self.listOfRecordedTransactions:
+			size += transaction.size
+			if size == 0:
+				self.closedDate = transaction.date
+				self.isClosed = True
+			newTrade.append(transaction)
+		self.extraTrades.append(Trade(newTrade))
+					
+	def getOpenedDate(self):
+		for transaction in self.listOfRecordedTransactions:
+			if transaction.date < self.openedDate:
+				self.openedDate = transaction.date
+
+	def averageEntry(self):
+		totalShares = 0
+		entries = 0
+		for transaction in self.listOfRecordedTransactions:
+			if transaction.size > 0:
+				totalShares += transaction.size
+				entries += transaction.size * transaction.price
+		return entries / totalShares
+	def averageExit(self):
+		totalShares = 0
+		exits = 0
+		for transaction in self.listOfRecordedTransactions:
+			if transaction.size < 0:
+				totalShares += transaction.size
+				exits += transaction.size * transaction.price
+		return exits / totalShares
+	def netProceed(self):
+		self.netProceeds =  (self.averageExit() - self.averageEntry()) * self.size
+		return self
+	def percentReturn(self):
+		if self.netProceed(): >= 0:
+			self.percentReturn =  self.netProceed()/(self.positionSize * self.averageEntry())
+		else:
+			self.percentReturn = 1 - (self.averageExit()/self.averageEntry()*self.positionSize)
+
+
+
+def main():			
+	file = "Portfolio.xlsx"
+	Transactions = pd.read_excel(file,sheetname=2)
+	listOfRecordedTransactions = []
+	listOfTrades = []
+	masterTickerList = []
+	for row in Transactions.rows: #spy,account,date,size,ticker,price
+		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],row['size'],row['ticker'],row['price'))
+		masterTickerList.append(row['ticker'])
+	for ticker in masterTickerList:
+		tempList = []	
+		for transaction in listOfRecordedTransactions:
+			if transaction.ticker == ticker:
+				tempList.append(transaction)
+		listOfTrades.append(Trade(tempList))
+			
+			
+			
+		
+
