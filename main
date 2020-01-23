@@ -12,7 +12,7 @@ class recordedTransaction:
 		self.convertToDate()
 		
 	def convertToDate(self):
-		return datetime.strptime(self.date, "%d/%m/%y")
+		return datetime.strptime(self.date, "%m/%d/%y")
 
 class Trade:
 	def __init__(self,listOfRecordedTransactions):
