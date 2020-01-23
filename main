@@ -99,7 +99,7 @@ def main():
 	listOfTrades = []
 	masterTickerList = []
 	for row in Transactions.rows: #spy,account,date,size,ticker,price
-		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],row['size'],row['ticker'],row['price'))
+		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],row['size'],row['ticker'],row['price']))
 		if row['ticker'] not in masterTickerList:
 			masterTickerList.append(row['ticker'])
 	for ticker in masterTickerList:
