@@ -144,16 +144,14 @@ def main():
 	closedTrades = []
 	currentlyTrading = False
 	for index,row in Transactions.iterrows(): #spy,account,date,size,ticker,price
-		print(row)
 		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],row['size'],row['ticker'],row['price']))
-		print(row['ticker'])
 	while len(listOfRecordedTransactions) != 0:
 		for record in listOfRecordedTransactions:
 			if currentlyTrading is False:
 				Trade = tempTrade(record.spy,record.account,record.date,record.size,record.ticker,record.price)
 				print("trade opened",Trade.ticker)
 				currentlyTrading = True
-			if Trade.ticker == record.ticker:
+			if Trade.ticker == record.ticker and Trade.currentShares != 0:
 				if record.size > 0:
 					print("%s trade added %s shares" % (record.ticker,record.size))
 					Trade.buys.append([record.price,record.size])
