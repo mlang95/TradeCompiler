@@ -1,19 +1,5 @@
-import pandas as pd
-import datetime import datetime, date
 
-class recordedTransaction:
-	def __init__(self,spy,account,date,size,ticker,price):
-		self.ticker = ticker
-		self.price = price
-		self.size = size
-		self.date = date
-		self.spy = spy
-		self.account = account
-		self.convertToDate()
-		
-	def convertToDate(self):
-		return datetime.strptime(self.date, "%m/%d/%y")
-
+'''
 class Trade:
 	def __init__(self,listOfRecordedTransactions):
 		self.currentSize = None
@@ -89,27 +75,105 @@ class Trade:
 			self.percentReturn =  self.netProceed()/(self.positionSize * self.averageEntry())
 		else:
 			self.percentReturn = 1 - (self.averageExit()/self.averageEntry()*self.positionSize)
+'''
 
+import pandas as pd
+from datetime import datetime, date
 
+class recordedTransaction:
+	def __init__(self,spy,account,date,size,ticker,price):
+		self.ticker = ticker
+		self.price = price
+		self.size = size
+		self.date = date
+		self.spy = spy
+		self.account = account
+		#self.convertToDate()
+		
+	def convertToDate(self):
+		return datetime.strptime(self.date, "%m/%d/%y")
 
+class tempTrade:
+	def __init__(self,spy,account,date,size,ticker,price):
+		self.initialDate = date
+		self.initialSPY= spy
+		self.initialAccount = account
+		self.ticker = ticker
+		self.buys = []
+		self.sells = []
+		self.closedDate = None
+		self.averageBuyPrice = 0
+		self.averageSellPrice = 0
+		self.totalShares = 0
+		self.portfolioPercent = 0.00
+		self.finalSPY = 0
+		self.currentShares = 0
+		self.isClosed = False
+		self.tradeReturn = 0 
+		self.initialPrice = price
+		self.closingPrice = 0
+		
+	def getAverages(self):
+		totalShares = sum([buy[1] for buy in self.buys])
+		buyPrice = 0
+		sellPrice = 0
+		for buy in self.buys:
+			buyPrice += buy[0]*buy[1]
+		for sell in self.sells:
+			sellPrice += abs(sell[0]*sell[1])
+		self.averageBuyPrice = buyPrice / totalShares
+		self.averageSellPrice = sellPrice / totalShares
+		self.totalShares = totalShares
+	
+	def getPortfolioPercent(self):
+		self.portfolioPercent = (self.averageBuyPrice*self.totalShares)/self.initialAccount
+
+	def closeTrade(self):
+		self.getPortfolioPercent()
+		self.getAverages()
+		self.isClosed = True
+		if self.averageBuyPrice > self.averageSellPrice:
+			self.tradeReturn = (self.averageSellPrice-self.averageBuyPrice)/self.averageBuyPrice
+		else:
+			self.tradeReturn = 1 - (self.averageSellPrice/self.averageBuyPrice)
 def main():			
 	file = "Portfolio.xlsx"
-	Transactions = pd.read_excel(file,sheetname=2)
-	listOfRecordedTransactions = []
-	listOfTrades = []
-	masterTickerList = []
-	for row in Transactions.rows: #spy,account,date,size,ticker,price
+	Transactions = pd.read_excel(file,sheet_name=1)
+	listOfRecordedTransactions = [] #our csv stored
+	openTrades = [] 
+	closedTrades = []
+	currentlyTrading = False
+	for index,row in Transactions.iterrows(): #spy,account,date,size,ticker,price
+		print(row)
 		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],row['size'],row['ticker'],row['price']))
-		if row['ticker'] not in masterTickerList:
-			masterTickerList.append(row['ticker'])
-	for ticker in masterTickerList:
-		tempList = []	
-		for transaction in listOfRecordedTransactions:
-			if transaction.ticker == ticker:
-				tempList.append(transaction)
-		listOfTrades.append(Trade(tempList))
+		print(row['ticker'])
+	while len(listOfRecordedTransactions) != 0:
+		for record in listOfRecordedTransactions:
+			if currentlyTrading is False:
+				Trade = tempTrade(record.spy,record.account,record.date,record.size,record.ticker,record.price)
+				print("trade opened",Trade.ticker)
+				currentlyTrading = True
+			if Trade.ticker == record.ticker:
+				if record.size > 0:
+					print("%s trade added %s shares" % (record.ticker,record.size))
+					Trade.buys.append([record.price,record.size])
+				else:
+					Trade.sells.append([record.price,record.size])
+					print("%s trade sold %s shares" % (record.ticker,abs(record.size)))
+				Trade.currentShares += record.size
+				if Trade.currentShares == 0:
+					Trade.finalSPY = record.spy
+					Trade.closedDate = record.date
+					Trade.closingPrice = record.price
+					Trade.closeTrade()
+					closedTrades.append(Trade)
+					print("trade closed",Trade.ticker)
+					currentlyTrading = False	
+				listOfRecordedTransactions.remove(record)
+		else:
+			openTrades.append(Trade)
+			currentlyTrading = False
 			
-			
-			
-		
-
+	for trade in closedTrades:
+		print("%s opened on %s for $%s, closed on %s for $%s, for return of %s%% with %s shares" % (trade.ticker,trade.initialDate,round(trade.averageBuyPrice,2),trade.closedDate,round(trade.averageSellPrice,2),round(trade.tradeReturn,2)*100,trade.totalShares))
+main()
