@@ -151,7 +151,7 @@ def main():
 				Trade = tempTrade(record.spy,record.account,record.date,record.size,record.ticker,record.price)
 				print("trade opened",Trade.ticker)
 				currentlyTrading = True
-			if Trade.ticker == record.ticker and Trade.currentShares != 0:
+			if Trade.ticker == record.ticker:
 				if record.size > 0:
 					print("%s trade added %s shares" % (record.ticker,record.size))
 					Trade.buys.append([record.price,record.size])
