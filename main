@@ -1,82 +1,3 @@
-
-'''
-class Trade:
-	def __init__(self,listOfRecordedTransactions):
-		self.currentSize = None
-		self.positionSize = None
-		self.openedDate = None
-		self.closedDate = None
-		self.entries = None
-		self.exits = None
-		self.isClosed = None
-		self.netProceeds = None
-		self.percentReturn = None
-		self.extraTrades = []
-		self.listOfRecordedTransactions = listOfRecordedTransactions
-		self.currentSize()
-		self.isClosed()
-		self.getOpenedDate()
-		if isClosed():
-			self.getPositionSize()
-			self.netProceed()
-			self.percentReturn()
-	
-	def checkForMultipleTrades(self):
-		if self.closedDate != self.listOfRecordedTransactions[-1].date:
-			transactionsToRemove = []
-			for transaction in self.listOfRecordedTransactions:	
-				if transaction.date > self.closedDate:
-					pass #work on this later
-				
-	def currentSize(self):
-		for transaction in self.listOfRecordedTransactions:
-			self.currentSize += transaction.size
-	def getPositionSize(self):
-		for transaction in self.listOfRecordedTransactions:
-			if transaction.size > 0:
-				self.positionSize += transaction.size
-	def isClosed(self):
-		size = 0
-		newTrade = []
-		for i,transaction in self.listOfRecordedTransactions:
-			size += transaction.size
-			if size == 0:
-				self.closedDate = transaction.date
-				self.isClosed = True
-			newTrade.append(transaction)
-		self.extraTrades.append(Trade(newTrade))
-					
-	def getOpenedDate(self):
-		for transaction in self.listOfRecordedTransactions:
-			if transaction.date < self.openedDate:
-				self.openedDate = transaction.date
-
-	def averageEntry(self):
-		totalShares = 0
-		entries = 0
-		for transaction in self.listOfRecordedTransactions:
-			if transaction.size > 0:
-				totalShares += transaction.size
-				entries += transaction.size * transaction.price
-		return entries / totalShares
-	def averageExit(self):
-		totalShares = 0
-		exits = 0
-		for transaction in self.listOfRecordedTransactions:
-			if transaction.size < 0:
-				totalShares += transaction.size
-				exits += transaction.size * transaction.price
-		return exits / totalShares
-	def netProceed(self):
-		self.netProceeds =  (self.averageExit() - self.averageEntry()) * self.size
-		return self
-	def percentReturn(self):
-		if self.netProceed(): >= 0:
-			self.percentReturn =  self.netProceed()/(self.positionSize * self.averageEntry())
-		else:
-			self.percentReturn = 1 - (self.averageExit()/self.averageEntry()*self.positionSize)
-'''
-
 import pandas as pd
 from datetime import datetime, date
 
@@ -106,15 +27,26 @@ class tempTrade:
 		self.averageSellPrice = 0
 		self.totalShares = 0
 		self.portfolioPercent = 0.00
+		self.tradeReturn = 0.00
 		self.finalSPY = 0
 		self.currentShares = 0
 		self.isClosed = False
 		self.tradeReturn = 0 
 		self.initialPrice = price
 		self.closingPrice = 0
+		self.status = ""
+		self.tradeLength = None
 	
 	def as_dict(self):
-		return {"initialPrice":self.initialPrice,"closeingPrice":self.closingPrice,"initialDate":self.initialDate,"initialSPY":self.initialSPY,"initialAccount":self.initialAccount,"ticker":self.ticker,"shares":self.totalShares,"finalSPY":self.finalSPY,"portfolioPercent":self.portfolioPercent}
+		return {"avgBuy":self.averageBuyPrice,"avgsell":self.averageSellPrice,"initialPrice":self.initialPrice,"closingPrice":self.closingPrice,"initialDate":self.initialDate,"initialSPY":self.initialSPY,"initialAccount":self.initialAccount,"ticker":self.ticker,"shares":self.totalShares,"finalSPY":self.finalSPY,"portfolioPercent":self.portfolioPercent,"status":self.status,"duration":self.tradeLength,"return":self.tradeReturn}
+	
+	def getTradeLength(self):
+		self.tradeLength = self.closedDate - self.initialDate
+	def getStatus(self):
+		if self.isClosed is True:
+			self.status = "Closed"
+		else:
+			self.status = "Open"
 	
 	def getAverages(self):
 		totalShares = sum([buy[1] for buy in self.buys])
@@ -128,24 +60,25 @@ class tempTrade:
 		self.averageSellPrice = sellPrice / totalShares
 		self.totalShares = totalShares
 	
-	def getPortfolioPercent(self):
-		self.portfolioPercent = (self.averageBuyPrice*self.totalShares)/self.initialAccount
+	def getPercents(self):
+		self.portfolioPercent = round((self.averageBuyPrice*self.totalShares)/self.initialAccount * 100,2)
+		if self.averageBuyPrice > self.averageSellPrice:
+			self.tradeReturn = round((1 - self.averageBuyPrice/self.averageSellPrice) *100,2)
+		else:
+			self.tradeReturn = round((self.averageSellPrice/self.averageBuyPrice - 1)*100,2)
 
 	def closeTrade(self):
-		self.getPortfolioPercent()
+		self.getTradeLength()
 		self.getAverages()
+		self.getPercents()
 		self.isClosed = True
-		if self.averageBuyPrice > self.averageSellPrice:
-			self.tradeReturn = (self.averageSellPrice-self.averageBuyPrice)/self.averageBuyPrice
-		else:
-			self.tradeReturn = 1 - (self.averageSellPrice/self.averageBuyPrice)
 			
 def convertListObjectsToDataFrame(list):
 	return pd.DataFrame([x.as_dict() for x in list])
 			
 
 def main():			
-	file = "PortfolioExampleScepterr.xlsx"
+	file = "Portfolio.xlsx"
 	Transactions = pd.read_excel(file,sheet_name=1)
 	listOfRecordedTransactions = [] #our csv stored
 	openTrades = [] 
@@ -157,29 +90,32 @@ def main():
 		for record in listOfRecordedTransactions:
 			if currentlyTrading is False:
 				Trade = tempTrade(record.spy,record.account,record.date,record.size,record.ticker,record.price)
-				print("trade opened",Trade.ticker)
+				#print("trade opened",Trade.ticker) 
 				currentlyTrading = True
 			if Trade.ticker == record.ticker:
 				if record.size > 0:
-					print("%s trade added %s shares" % (record.ticker,record.size))
+					#print("%s trade added %s shares" % (record.ticker,record.size))
 					Trade.buys.append([record.price,record.size])
 				else:
 					Trade.sells.append([record.price,record.size])
-					print("%s trade sold %s shares" % (record.ticker,abs(record.size)))
+					#print("%s trade sold %s shares" % (record.ticker,abs(record.size)))
 				Trade.currentShares += record.size
 				if Trade.currentShares == 0:
 					Trade.finalSPY = record.spy
 					Trade.closedDate = record.date
 					Trade.closingPrice = record.price
 					Trade.closeTrade()
+					Trade.getStatus()
 					closedTrades.append(Trade)
-					print("trade closed",Trade.ticker)
+					#print("trade closed",Trade.ticker)
 					currentlyTrading = False
 				listOfRecordedTransactions.remove(record)
 				break
 		else:
 			currentlyTrading = False
-		dataframeToExcel = convertListObjectsToDataFrame(closedTrades+openTrades)
+			Trade.getStatus()
+			openTrades.append(Trade)
+	dataframeToExcel = convertListObjectsToDataFrame(closedTrades)
 	dataframeToExcel.to_excel(excel_writer="Transactions.xlsx",sheet_name="Sheet1")		
 	#for trade in closedTrades:
 	#	print("%s opened on %s for $%s, closed on %s for $%s, for return of %s%% with %s shares" % (trade.ticker,trade.initialDate,round(trade.averageBuyPrice,2),trade.closedDate,round(trade.averageSellPrice,2),round(trade.tradeReturn,2)*100,trade.totalShares))
