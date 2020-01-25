@@ -112,7 +112,10 @@ class tempTrade:
 		self.tradeReturn = 0 
 		self.initialPrice = price
 		self.closingPrice = 0
-		
+	
+	def as_dict(self):
+		return {"initialDate":self.initialDate,"initialSPY":self.initialSPY,"initialAccount":self.initialAccount,"ticker":self.ticker,"shares":self.totalShares,"finalSPY":self.finalSPY,"portfolioPercent":self.portfolioPercent}
+	
 	def getAverages(self):
 		totalShares = sum([buy[1] for buy in self.buys])
 		buyPrice = 0
@@ -136,8 +139,13 @@ class tempTrade:
 			self.tradeReturn = (self.averageSellPrice-self.averageBuyPrice)/self.averageBuyPrice
 		else:
 			self.tradeReturn = 1 - (self.averageSellPrice/self.averageBuyPrice)
+			
+def convertListObjectsToDataFrame(list):
+	return pd.DataFrame([x.as_dict() for x in list])
+			
+
 def main():			
-	file = "Portfolio.xlsx"
+	file = "PortfolioExampleScepterr.xlsx"
 	Transactions = pd.read_excel(file,sheet_name=1)
 	listOfRecordedTransactions = [] #our csv stored
 	openTrades = [] 
@@ -166,12 +174,16 @@ def main():
 					Trade.closeTrade()
 					closedTrades.append(Trade)
 					print("trade closed",Trade.ticker)
-					currentlyTrading = False	
+					currentlyTrading = False
+					continue
 				listOfRecordedTransactions.remove(record)
 		else:
 			openTrades.append(Trade)
 			currentlyTrading = False
 			
-	for trade in closedTrades:
-		print("%s opened on %s for $%s, closed on %s for $%s, for return of %s%% with %s shares" % (trade.ticker,trade.initialDate,round(trade.averageBuyPrice,2),trade.closedDate,round(trade.averageSellPrice,2),round(trade.tradeReturn,2)*100,trade.totalShares))
+	dataframeToExcel = convertListObjectsToDataFrame(closedTrades)
+	dataframeToExcel.to_excel(excel_writer="Transactions.xlsx",sheet_name="Sheet1")		
+	#for trade in closedTrades:
+	#	print("%s opened on %s for $%s, closed on %s for $%s, for return of %s%% with %s shares" % (trade.ticker,trade.initialDate,round(trade.averageBuyPrice,2),trade.closedDate,round(trade.averageSellPrice,2),round(trade.tradeReturn,2)*100,trade.totalShares))
 main()
+
