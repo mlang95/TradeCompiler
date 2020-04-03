@@ -1,5 +1,9 @@
 import pandas as pd
 from datetime import datetime, date
+from html import unescape
+from bs4 import BeautifulSoup
+from urllib.request import urlopen
+import urllib.request
 
 class recordedTransaction:
 	def __init__(self,spy,account,date,size,ticker,price):
@@ -9,17 +13,14 @@ class recordedTransaction:
 		self.date = date
 		self.spy = spy
 		self.account = account
-		#self.convertToDate()
 		
-	def convertToDate(self):
-		return datetime.strptime(self.date, "%m/%d/%y")
-
-class tempTrade:
+class TradeObject:
 	def __init__(self,spy,account,date,size,ticker,price):
 		self.initialDate = date
 		self.initialSPY= spy
 		self.initialAccount = account
 		self.ticker = ticker
+		self.initialPrice = price
 		self.buys = []
 		self.sells = []
 		self.closedDate = None
@@ -32,13 +33,21 @@ class tempTrade:
 		self.currentShares = 0
 		self.isClosed = False
 		self.tradeReturn = 0 
-		self.initialPrice = price
 		self.closingPrice = 0
 		self.status = ""
 		self.tradeLength = None
+		self.sharesOutstanding = None
+		self.float = None
+		self.shortFloat = None
+		self.beta = None
+		self.avgVolume = None
+		self.tradeEffect = None
 	
 	def as_dict(self):
-		return {"avgBuy":self.averageBuyPrice,"avgsell":self.averageSellPrice,"initialPrice":self.initialPrice,"closingPrice":self.closingPrice,"initialDate":self.initialDate,"initialSPY":self.initialSPY,"initialAccount":self.initialAccount,"ticker":self.ticker,"shares":self.totalShares,"finalSPY":self.finalSPY,"portfolioPercent":self.portfolioPercent,"status":self.status,"duration":self.tradeLength,"return":self.tradeReturn}
+		return {"avgBuy":self.averageBuyPrice,"avgsell":self.averageSellPrice,"initialPrice":self.initialPrice,"closingPrice":self.closingPrice,"initialDate":self.initialDate,"initialSPY":self.initialSPY,"initialAccount":self.initialAccount,"ticker":self.ticker,"shares":self.totalShares,"finalSPY":self.finalSPY,"portfolioPercent":self.portfolioPercent,"status":self.status,"duration":self.tradeLength,"return":self.tradeReturn,"sharesOutstanding":self.sharesOutstanding,"float":self.float,"shortFloat":self.shortFloat,"beta":self.beta,"tradeEffect":self.tradeEffect,"avgVolume":self.avgVolume}
+	
+	def getTradeEffect(self):
+		self.tradeEffect = self.tradeReturn / self.portfolioPercent
 	
 	def getTradeLength(self):
 		self.tradeLength = self.closedDate - self.initialDate
@@ -75,21 +84,37 @@ class tempTrade:
 			
 def convertListObjectsToDataFrame(list):
 	return pd.DataFrame([x.as_dict() for x in list])
-			
 
+def convertToMillions(value):
+	if "M" in value:
+		return float(value[:-1])*1000000
+	elif "-" in value:
+		return 0
+	else:
+		return float(value)
+def convertToPercent(value):
+	if "%" in value:
+		return float(value[:-1])/100
+	else:
+		return 0
+def convertBeta(value):
+	if "-" in value:
+		return 0
+	else:
+		return float(value)
 def main():			
 	file = "Portfolio.xlsx"
-	Transactions = pd.read_excel(file,sheet_name=1)
-	listOfRecordedTransactions = [] #our csv stored
+	Transactions = pd.read_excel(file,sheet_name=2)
+	listOfRecordedTransactions = []
 	openTrades = [] 
 	closedTrades = []
 	currentlyTrading = False
 	for index,row in Transactions.iterrows(): #spy,account,date,size,ticker,price
-		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],row['size'],row['ticker'],row['price']))
+		listOfRecordedTransactions.append(recordedTransaction(row['spy'],row['account'],row['date'],int(row['size']),row['ticker'],row['price']))
 	while len(listOfRecordedTransactions) != 0:
 		for record in listOfRecordedTransactions:
 			if currentlyTrading is False:
-				Trade = tempTrade(record.spy,record.account,record.date,record.size,record.ticker,record.price)
+				Trade = TradeObject(record.spy,record.account,record.date,record.size,record.ticker,record.price)
 				#print("trade opened",Trade.ticker) 
 				currentlyTrading = True
 			if Trade.ticker == record.ticker:
@@ -106,17 +131,43 @@ def main():
 					Trade.closingPrice = record.price
 					Trade.closeTrade()
 					Trade.getStatus()
+					Trade.getTradeEffect()
 					closedTrades.append(Trade)
 					#print("trade closed",Trade.ticker)
 					currentlyTrading = False
 				listOfRecordedTransactions.remove(record)
 				break
+			#print(Trade.ticker,Trade.currentShares)
 		else:
 			currentlyTrading = False
 			Trade.getStatus()
 			openTrades.append(Trade)
-	dataframeToExcel = convertListObjectsToDataFrame(closedTrades)
+	print("Done Compiling")	
+	for trade in closedTrades:
+		page = urlopen("https://finviz.com/quote.ashx?t="+ trade.ticker + "&ty=c&ta=0&p=d").read()
+		soup = BeautifulSoup(page, "html5lib")
+		table = soup.find_all('table')
+		table_body = table[3].find('tbody') #is the 4th table on the page afaik
+		cells = table_body.find_all('td')
+		i=0
+		while i < (len(cells)):
+		#may have to str() everything to get it to work
+			if 'Shs Outstand' in cells[i]:
+				trade.sharesOutstanding = convertToMillions(cells[i+1].text)
+			if 'Shs Float' in cells[i]:
+				trade.float = convertToMillions(cells[i+1].text)
+			if 'Short Float' in cells[i]:
+				trade.shortFloat = convertToPercent(cells[i+1].text)
+			if 'Avg Volume' in cells[i]:
+				trade.averageVolume = cells[i+1].text
+			if "Beta" in cells[i]:
+				trade.beta = convertBeta(cells[i+1].text)
+			i+=1
+	print("Done Scraping!")
+	dataframeToExcel = convertListObjectsToDataFrame(closedTrades+openTrades)
 	dataframeToExcel.to_excel(excel_writer="Transactions.xlsx",sheet_name="Sheet1")		
+	print("Sent")
+	y = input()
 	#for trade in closedTrades:
 	#	print("%s opened on %s for $%s, closed on %s for $%s, for return of %s%% with %s shares" % (trade.ticker,trade.initialDate,round(trade.averageBuyPrice,2),trade.closedDate,round(trade.averageSellPrice,2),round(trade.tradeReturn,2)*100,trade.totalShares))
 main()
